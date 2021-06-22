@@ -4,15 +4,20 @@ import { BeaconsForm } from "../../components/BeaconsForm";
 import { FormGroup } from "../../components/Form";
 import { RadioList, RadioListItem } from "../../components/RadioList";
 import { GovUKBody } from "../../components/Typography";
+import { BasicAuthGateway } from "../../gateways/basicAuthGateway";
 import { FieldManager } from "../../lib/form/fieldManager";
 import { FormManager } from "../../lib/form/formManager";
 import { Validators } from "../../lib/form/validators";
+import { FormPageProps } from "../../lib/handlePageRequest";
 import {
-  DestinationIfValidCallback,
-  FormPageProps,
-  handlePageRequest,
-} from "../../lib/handlePageRequest";
+  BeaconsContext,
+  decorateGetServerSidePropsContext,
+} from "../../lib/middleware";
+import { redirectUserTo } from "../../lib/redirectUserTo";
+import { Registration } from "../../lib/registration/registration";
 import { PageURLs } from "../../lib/urls";
+import { verifyFormSubmissionCookieIsSet } from "../../lib/verifyFormSubmissionCookieIsSet";
+import { AuthenticateUser } from "../../useCases/authenticateUser";
 
 const getPageForm = ({ signUpOrSignIn }) => {
   return new FormManager({
@@ -68,22 +73,51 @@ export const SignUpOrSignIn: FunctionComponent<FormPageProps> = ({
   );
 };
 
-const onSuccessfulFormCallback: DestinationIfValidCallback = async (
-  context
-) => {
-  switch (context.formData.signUpOrSignIn) {
-    case "signUp":
-      return PageURLs.signUp;
-    case "signIn":
-      return PageURLs.signIn;
-  }
-};
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const authGateway = new BasicAuthGateway();
+  const authUseCase = new AuthenticateUser(authGateway);
+  await authUseCase.execute(context);
 
-export const getServerSideProps: GetServerSideProps = handlePageRequest(
-  "",
-  getPageForm,
-  (f) => f,
-  onSuccessfulFormCallback
-);
+  if (!verifyFormSubmissionCookieIsSet(context))
+    return redirectUserTo(PageURLs.start);
+
+  const beaconsContext: BeaconsContext =
+    await decorateGetServerSidePropsContext(context);
+
+  const registration: Registration = beaconsContext.registration;
+  const flattenedRegistration = registration.getFlattenedRegistration({
+    useIndex: beaconsContext.useIndex,
+  });
+
+  const formManager = getPageForm(flattenedRegistration);
+
+  if (beaconsContext.req.method === "POST") {
+    const destination = (context) => {
+      switch (context.formData.signUpOrSignIn) {
+        case "signUp":
+          return PageURLs.signUp;
+        case "signIn":
+          return PageURLs.signIn;
+      }
+    };
+
+    console.log("DESTINATION", destination(beaconsContext));
+    return {
+      redirect: {
+        statusCode: 303,
+        destination: destination(beaconsContext),
+      },
+    };
+  }
+  return {
+    props: {
+      form: formManager.serialise(),
+      showCookieBanner: beaconsContext.showCookieBanner,
+      registration: registration.getRegistration(),
+      flattenedRegistration,
+      useIndex: beaconsContext.useIndex,
+    },
+  };
+};
 
 export default SignUpOrSignIn;

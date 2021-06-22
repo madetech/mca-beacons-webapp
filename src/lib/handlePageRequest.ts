@@ -3,6 +3,7 @@ import {
   GetServerSidePropsContext,
   GetServerSidePropsResult,
 } from "next";
+import { getSession } from "next-auth/client";
 import { BasicAuthGateway } from "../gateways/basicAuthGateway";
 import { AuthenticateUser } from "../useCases/authenticateUser";
 import { FormJSON, FormManager } from "./form/formManager";
@@ -61,15 +62,28 @@ export const handlePageRequest = (
     return handleGetRequest(beaconsContext, formManagerFactory);
   });
 
-const handleGetRequest = (
+const handleGetRequest = async (
   context: BeaconsContext,
   formManagerFactory: FormManagerFactory
-): GetServerSidePropsResult<FormPageProps> => {
+): Promise<GetServerSidePropsResult<FormPageProps>> => {
   const registration: Registration = context.registration;
   const flattenedRegistration = registration.getFlattenedRegistration({
     useIndex: context.useIndex,
   });
   const formManager = formManagerFactory(flattenedRegistration);
+
+  const session = await getSession();
+
+  console.log("session", session);
+
+  if (!session) {
+    return {
+      redirect: {
+        permanent: false,
+        destination: "/account/sign-up-or-sign-in",
+      },
+    };
+  }
 
   return {
     props: {
