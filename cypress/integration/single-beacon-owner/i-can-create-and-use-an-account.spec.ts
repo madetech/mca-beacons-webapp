@@ -54,4 +54,22 @@ describe("As user with an account", () => {
     thenICanSeeAnInputWithPlaceholder("#email", "Email Address");
     thenICanSeeAnInputWithPlaceholder("#password", "Password");
   });
+
+  it("I can reset my password", () => {
+    givenIHaveBeenTo(PageURLs.start);
+    givenIHaveBeenTo(PageURLs.signUpOrSignIn);
+    givenIHaveSelected("#signIn");
+    givenIHaveClickedContinue();
+    thenTheUrlShouldContain(
+      "b2cmcga.b2clogin.com/B2CMCGA.onmicrosoft.com/B2C_1_login_beacons"
+    );
+    givenIHaveWaitedForAzureB2C();
+    givenIHaveClicked("#forgotPassword");
+    thenTheUrlShouldContain(
+      "b2cmcga.b2clogin.com/B2CMCGA.onmicrosoft.com/B2C_1_resetpassword_beacons"
+    );
+    givenIHaveWaitedForAzureB2C();
+    iCanSeeAPageHeadingThatContains("Password reset: Send Verification Code");
+    thenICanSeeAnInputWithPlaceholder("#email", "Email Address");
+  });
 });
